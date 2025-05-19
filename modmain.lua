@@ -51,6 +51,7 @@ local function hug_onenter_common(inst, target)
         inst.sg:GoToState("idle")
     end
 
+    inst.DynamicShadow:Enable(false)
     inst.Transform:SetNoFaced()
 
     inst.sg.statemem.target = target
@@ -89,6 +90,7 @@ local hug_onupdate = function(inst)
 end
 
 local hug_onexit = function(inst)
+    inst.DynamicShadow:Enable(true)
     inst.AnimState:SetScale(1, 1, 1)
     inst.Transform:SetFourFaced()
     MakeCharacterPhysics(inst, 75, .5)
