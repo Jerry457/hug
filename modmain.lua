@@ -7,10 +7,25 @@ modimport("main/strings")
 local AddAction = AddAction
 local AddComponentAction = AddComponentAction
 local AddStategraphState = AddStategraphState
+local AddPlayerPostInit = AddPlayerPostInit
 local AddStategraphActionHandler = AddStategraphActionHandler
 GLOBAL.setfenv(1, GLOBAL)
 
-local HUG = Action({distance = 2, }) -- instant = true, mount_valid = true
+AddPlayerPostInit(function(inst)
+    if not TheWorld.ismastersim then
+        return
+    end
+
+    local _getstatus = inst.components.inspectable.getstatus
+    inst.components.inspectable.getstatus = function(inst, ...)
+        if inst.sg ~= nil and inst.sg:HasStateTag("huging") then
+            return "HUGGER"
+        end
+        return _getstatus(inst, ...)
+    end
+end)
+
+local HUG = Action({ distance = 2, }) -- instant = true, mount_valid = true
 HUG.id = "HUG"
 HUG.fn = function(act)
     if act.doer and act.target then
@@ -61,10 +76,15 @@ local hug_events = {
 }
 
 local hug_onupdate = function(inst)
-    if inst.sg.statemem.target and not inst.sg.statemem.target.sg:HasStateTag("huging") then
-        inst.sg.statemem.target.sg:RemoveStateTag("huging")
-        inst.AnimState:PlayAnimation("player_hug_pst", false)
-        inst.sg.statemem.target.sg:GoToState("idle", true)
+    local target = inst.sg.statemem.target
+    if target ~= nil and not target.sg:HasStateTag("huging") then
+        target.sg:RemoveStateTag("huging")
+        target.AnimState:PlayAnimation("player_hug_pst", false)
+        target.sg:GoToState("idle", true)
+
+        if inst.components.temperature ~= nil and target.components.temperature ~= nil then
+            inst.components.temperature:SetModifier("hug", target.temperature.current - inst.components.temperature.current)
+        end
     end
 end
 
@@ -75,12 +95,16 @@ local hug_onexit = function(inst)
     inst.components.locomotor:Stop()
     inst.AnimState:ClearOverrideBuild("player_hug")
 
-    if inst.sg.statemem.target and inst.sg.statemem.target.sg:HasStateTag("huging") then
-        inst.sg.statemem.target.sg:RemoveStateTag("huging")
-        inst.AnimState:PlayAnimation("player_hug_pst", false)
-        inst.sg.statemem.target.sg:GoToState("idle", true)
+    if inst.components.temperature ~= nil then
+        inst.components.temperature:RemoveModifier("hug")
     end
 
+    local target = inst.sg.statemem.target
+    if target ~= nil and target.sg:HasStateTag("huging") then
+        target.sg:RemoveStateTag("huging")
+        target.AnimState:PlayAnimation("player_hug_pst", false)
+        target.sg:GoToState("idle", true)
+    end
 end
 
 local states = {
